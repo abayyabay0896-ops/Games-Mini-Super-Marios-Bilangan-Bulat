@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Game Bola - Bilangan Bulat (Update)</title>
+<style>
+body { margin:0; overflow:hidden; font-family:Arial; }
+canvas { background:#6fcf97; display:block; }
+
+#quizBox {
+ position:absolute;
+ top:30%;
+ left:50%;
+ transform:translate(-50%,-50%);
+ background:white;
+ padding:20px;
+ border:3px solid black;
+ display:none;
+}
+
+#controls {
+ position:absolute;
+ bottom:20px;
+ width:100%;
+ text-align:center;
+}
+button {
+ font-size:20px;
+ padding:10px 20px;
+ margin:5px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="quizBox">
+  <p id="q"></p>
+  <input type="number" id="ans">
+  <button onclick="cek()">Jawab</button>
+</div>
+
+<div id="controls">
+ <button ontouchstart="press('ArrowLeft')" ontouchend="release('ArrowLeft')">◀</button>
+ <button ontouchstart="press('ArrowRight')" ontouchend="release('ArrowRight')">▶</button>
+ <button ontouchstart="press('Space')" ontouchend="release('Space')">⭡</button>
+</div>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+c.width = window.innerWidth;
+c.height = window.innerHeight;
+
+// musik latar
+let music = new Audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3");
+music.loop = true;
+
+// sound lompat
+let jumpSound = new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3");
+
+function startMusic(){
+ if(music.paused){
+  music.play().catch(()=>{});
+ }
+}
+
+let level = 1;
+let score = 0;
+
+let player = {
+ x:100,y:100,w:40,h:40,
+ dx:0,dy:0,
+ speed:5,jump:-12,ground:false
+};
+
+let musuh = [
+ {x:500,y:c.height-80,w:40,h:40,dir:1}
+];
+
+let platform = [
+ {x:0,y:c.height-40,w:c.width,h:40},
+ {x:200,y:c.height-120,w:150,h:20},
+ {x:400,y:c.height-200,w:150,h:20}
+];
+
+let coin = [
+ {x:250,y:c.height-150,a:true},
+ {x:450,y:c.height-230,a:true}
+];
+
+let keys={};
+let grav=0.6;
+let jawaban=0;
+
+function press(k){ keys[k]=true; startMusic(); }
+function release(k){ keys[k]=false; }
+
+document.addEventListener("keydown",e=>{keys[e.code]=true; startMusic();});
+document.addEventListener("keyup",e=>keys[e.code]=false);
+
+function update(){
+
+ if(keys["ArrowLeft"]) player.dx=-player.speed;
+ else if(keys["ArrowRight"]) player.dx=player.speed;
+ else player.dx=0;
+
+ if(keys["Space"] && player.ground){
+  player.dy=player.jump;
+  player.ground=false;
+  jumpSound.play();
+ }
+
+ player.dy+=grav;
+ player.x+=player.dx;
+ player.y+=player.dy;
+
+ player.ground=false;
+
+ platform.forEach(p=>{
+  if(player.x < p.x+p.w &&
+     player.x+player.w > p.x &&
+     player.y < p.y+p.h &&
+     player.y+player.h > p.y){
+      if(player.dy>0){
+       player.y=p.y-player.h;
+       player.dy=0;
+       player.ground=true;
+      }
+  }
+ });
+
+ musuh.forEach(m=>{
+  m.x += m.dir*2;
+  if(m.x<0 || m.x>c.width-40) m.dir*=-1;
+
+  if(player.x < m.x+m.w &&
+     player.x+player.w > m.x &&
+     player.y < m.y+m.h &&
+     player.y+player.h > m.y){
+       alert("Kena musuh! ulang level");
+       reset();
+  }
+ });
+
+ coin.forEach(k=>{
+  if(k.a &&
+    player.x < k.x+20 &&
+    player.x+player.w > k.x &&
+    player.y < k.y+20 &&
+    player.y+player.h > k.y){
+      k.a=false;
+      soal();
+  }
+ });
+
+ if(player.y>c.height) reset();
+}
+
+function draw(){
+ ctx.clearRect(0,0,c.width,c.height);
+
+ ctx.fillStyle="white";
+ ctx.beginPath();
+ ctx.arc(player.x+20,player.y+20,20,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="brown";
+ platform.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+
+ ctx.fillStyle="red";
+ musuh.forEach(m=>ctx.fillRect(m.x,m.y,m.w,m.h));
+
+ ctx.fillStyle="yellow";
+ coin.forEach(k=>{
+  if(k.a) ctx.fillRect(k.x,k.y,20,20);
+ });
+
+ ctx.fillStyle="black";
+ ctx.fillText("Score: "+score,20,30);
+ ctx.fillText("Level: "+level,20,50);
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+
+function soal(){
+ let a = Math.floor(Math.random()*5)+1;
+ let b = Math.floor(Math.random()*5)+1;
+
+ document.getElementById("q").innerText =
+ a+" - "+b+" = ?";
+ jawaban = a - b;
+
+ document.getElementById("quizBox").style.display="block";
+}
+
+function cek(){
+ let user = parseInt(document.getElementById("ans").value);
+
+ if(user===jawaban){
+  score+=10;
+  alert("Benar!");
+ } else {
+  alert("Salah! "+jawaban);
+ }
+
+ document.getElementById("quizBox").style.display="none";
+
+ if(score>=level*20){
+  level++;
+  nextLevel();
+ }
+}
+
+function nextLevel(){
+ musuh.push({x:300,y:c.height-80,w:40,h:40,dir:1});
+ coin.forEach(k=>k.a=true);
+}
+
+function reset(){
+ player.x=100;
+ player.y=100;
+ player.dy=0;
+}
+
+loop();
+</script>
+
+</body>
+</html>
